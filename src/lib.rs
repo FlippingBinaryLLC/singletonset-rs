@@ -1,0 +1,339 @@
+#![doc = include_str!("../README.md")]
+
+use std::{
+    any::{Any, TypeId},
+    collections::{HashMap, TryReserveError},
+};
+
+/// A hash map that uses the value's type as its key.
+///
+/// This data structure can be used to create a locally-scoped Singleton out
+/// of any data type it holds. It ensures there is only one instance of any
+/// type, similar to a Singleton, without requiring a global scope.
+#[derive(Debug, Default)]
+pub struct SingletonSet {
+    data: HashMap<TypeId, Box<dyn Any>>,
+}
+
+impl SingletonSet {
+    /// Creates an empty `SingletonSet`.
+    ///
+    /// The set is initially created with a capacity of 0, so it will not
+    /// allocate until an element is inserted. This behavior is inherited
+    /// from the internal `HashMap` that is used to stored the elements.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use singletonset::SingletonSet;
+    /// let mut set = SingletonSet::new();
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        SingletonSet {
+            data: HashMap::new(),
+        }
+    }
+
+    /// Creates an empty `SingletonSet` with at least the specified capacity.
+    ///
+    /// The set will be able to hold at least `capacity` elements without
+    /// reallocating. The hash map that stores the elements internally does
+    /// not provide any guarantee that more space won't be allocated.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use singletonset::SingletonSet;
+    /// let mut set: SingletonSet = SingletonSet::with_capacity(10);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        SingletonSet {
+            data: HashMap::with_capacity(capacity),
+        }
+    }
+
+    /// Returns the number of elements the set can hold without reallocating.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.data.capacity()
+    }
+
+    /// Returns the number of elements the set currently holds.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Returns true if the set contains no elements.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Clears the set, removing all values.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.data.clear()
+    }
+
+    /// Reserves capacity for at least `additional` more values.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.data.reserve(additional)
+    }
+
+    /// Tries to reserve capacity for at least `additional` more values.
+    #[inline]
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
+        self.data.try_reserve(additional)
+    }
+
+    /// Shrinks the capacity of the set as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.data.shrink_to_fit()
+    }
+
+    /// Shrinks the capacity of the set as much as possible, but not less than
+    /// `min_capacity`.
+    #[inline]
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        self.data.shrink_to(min_capacity)
+    }
+
+    /// Returns an immutable reference to the value of the specified type.
+    ///
+    /// This method does not insert an element into the set, so it can be
+    /// used with types that do not implement [`Default`] and does not need
+    /// the `SimpletonSet` to be mutable.
+    ///
+    /// # Safety
+    ///
+    /// This method panics if there is no existing value for the given type.
+    /// If this is not acceptable, use [`SingletonSet::try_get()`],
+    /// [`SingletonSet::get_mut()`], or one of the `get_or` methods.
+    pub fn get<T>(&self) -> &T
+    where
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data
+            .get(&type_id)
+            .and_then(|boxed| boxed.downcast_ref::<T>())
+            .expect("try_get() should be used if the slot might be empty")
+    }
+
+    /// Returns an immutable reference to the value of the specified type,
+    /// if it exists.
+    ///
+    /// This method does not insert an element into the set, so it can be
+    /// used with types that do not implement [`Default`] and does not need
+    /// the `SimpletonSet` to be mutable.
+    pub fn try_get<T>(&self) -> Option<&T>
+    where
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data
+            .get(&type_id)
+            .and_then(|boxed| boxed.downcast_ref::<T>())
+    }
+
+    /// Returns a mutable reference to the value of the specified type.
+    ///
+    /// This method inserts an element into the set if the type is not
+    /// already represented, so the type must implement [`Default`].
+    pub fn get_mut<T>(&mut self) -> &mut T
+    where
+        T: Any + Default,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data.entry(type_id).or_insert(Box::new(T::default()));
+        self.data
+            .get_mut(&type_id)
+            .and_then(|boxed| boxed.downcast_mut::<T>())
+            // Safety: The key exists and the type must be correct
+            .unwrap()
+    }
+
+    /// Returns a mutable reference to the value of the specified type,
+    /// if it exists.
+    ///
+    /// This method does not insert an element into the set, so it can be
+    /// used with types that do not implement [`Default`].
+    pub fn try_get_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data
+            .get_mut(&type_id)
+            .and_then(|boxed| boxed.downcast_mut::<T>())
+    }
+
+    /// Returns an immutable reference to the value of the specified type,
+    /// inserting the provided value if the type isn't already in the set.
+    ///
+    /// If the type is already represented in the set, the provided value
+    /// is ignored.
+    pub fn get_or_insert<T>(&mut self, value: T) -> &T
+    where
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data.entry(type_id).or_insert(Box::new(value));
+        self.data
+            .get(&type_id)
+            .and_then(|boxed| boxed.downcast_ref::<T>())
+            // Safety: The key exists and the type must be correct
+            .unwrap()
+    }
+
+    /// Returns a mutable reference to the value of the specified type,
+    /// inserting the provided value if the type isn't already in the set.
+    ///
+    /// If the type is already represented in the set, the provided value
+    /// is ignored. To avoid allocating memory for a default value that is
+    /// discarded, use [`SingletonSet::get_or_insert_with_mut()`].
+    pub fn get_or_insert_mut<T>(&mut self, value: T) -> &mut T
+    where
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data.entry(type_id).or_insert(Box::new(value));
+        self.data
+            .get_mut(&type_id)
+            .and_then(|boxed| boxed.downcast_mut::<T>())
+            // Safety: The key exists and the type must be correct
+            .unwrap()
+    }
+
+    /// Returns an immutable reference to the value of the specified type,
+    /// inserting the return value of the provided method if the type isn't
+    /// already in the set.
+    pub fn get_or_insert_with<F, T>(&mut self, default: F) -> &T
+    where
+        F: FnOnce() -> T,
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data
+            .entry(type_id)
+            .or_insert_with(|| Box::new(default()));
+        self.data
+            .get(&type_id)
+            .and_then(|boxed| boxed.downcast_ref::<T>())
+            // Safety: The key exists and the type must be correct
+            .unwrap()
+    }
+
+    /// Returns a mutable reference to the value of the specified type,
+    /// inserting the return value of the provided method if the type isn't
+    /// already in the set.
+    pub fn get_or_insert_with_mut<F, T>(&mut self, default: F) -> &mut T
+    where
+        F: FnOnce() -> T,
+        T: Any,
+    {
+        let type_id = std::any::TypeId::of::<T>();
+        self.data
+            .entry(type_id)
+            .or_insert_with(|| Box::new(default()));
+        self.data
+            .get_mut(&type_id)
+            .and_then(|boxed| boxed.downcast_mut::<T>())
+            // Safety: The key exists and the type must be correct
+            .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_singletonset_retains_last_element_of_type() {
+        let mut set = SingletonSet::new();
+
+        *set.get_mut() = 1u8;
+        *set.get_mut() = 2u8;
+        *set.get_mut() = 3u8;
+        *set.get_mut() = 1u16;
+        *set.get_mut() = 2u16;
+        *set.get_mut() = 3u32;
+        *set.get_mut() = 2u32;
+        *set.get_mut() = "foo";
+        *set.get_mut() = "bar";
+        *set.get_mut() = "baz".to_string();
+
+        assert_eq!(set.len(), 5);
+        assert_ne!(set.get::<u8>(), &1u8);
+        assert_ne!(set.get::<u8>(), &1u8);
+        assert_eq!(set.get::<u8>(), &3u8);
+        assert_ne!(set.get::<u16>(), &1u16);
+        assert_eq!(set.get::<u16>(), &2u16);
+        assert_ne!(set.get::<u32>(), &3u32);
+        assert_eq!(set.get::<u32>(), &2u32);
+        assert_ne!(set.get::<&str>(), &"foo");
+        assert_eq!(set.get::<&str>(), &"bar");
+        assert_eq!(set.get::<String>(), &"baz".to_string());
+    }
+
+    #[test]
+    fn test_singletonset_mutations() {
+        let mut set = SingletonSet::new();
+
+        *set.get_mut() = "foo".to_string();
+        (*set.get_mut::<String>()).push_str("bar");
+
+        *set.get_mut::<u8>() += 2;
+        *set.get_mut::<u8>() *= 2;
+
+        // The "Hello, World!" string should be gone, replaced by the longer
+        // one, which can be retrieved by accessing the `&str` element.
+        assert_ne!(set.get::<String>(), &"foo".to_string());
+        assert_eq!(set.get::<String>(), &"foobar".to_string());
+        assert_ne!(set.get::<u8>(), &2);
+        assert_eq!(set.get::<u8>(), &4);
+    }
+
+    #[test]
+    fn singletonset_works_without_default() {
+        let mut set = SingletonSet::new();
+
+        #[derive(Debug, PartialEq)]
+        struct Foo(&'static str);
+
+        assert_eq!(set.try_get::<Foo>(), None);
+
+        set.get_or_insert(Foo("bar"));
+
+        assert_eq!(set.try_get::<Foo>(), Some(&Foo("bar")));
+    }
+
+    #[test]
+    fn singletonset_works_with_custom_defaults() {
+        let mut set = SingletonSet::new();
+
+        #[derive(Debug, PartialEq)]
+        struct Foo(&'static str);
+
+        impl Default for Foo {
+            fn default() -> Self {
+                Self("foo")
+            }
+        }
+
+        set.get_mut::<Foo>();
+
+        assert_eq!(set.try_get::<Foo>(), Some(&Foo("foo")));
+
+        *set.get_mut() = Foo("bar");
+
+        assert_eq!(set.try_get::<Foo>(), Some(&Foo("bar")));
+    }
+}
