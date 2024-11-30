@@ -2,8 +2,9 @@
 
 use std::{
     any::{Any, TypeId},
-    collections::{HashMap, TryReserveError},
 };
+
+use hashbrown::{HashMap, TryReserveError};
 
 /// A hash map that uses the value's type as its key.
 ///

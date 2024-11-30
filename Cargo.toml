@@ -10,3 +10,6 @@ repository = "https://github.com/FlippingBinaryLLC/singletonset-rs"
 rust-version = "1.57.0"
 edition = "2021"
 exclude = [".gitignore", ".github", ".markdownlint.jsonc"]
+
+[dependencies]
+hashbrown = "0.15"
