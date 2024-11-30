@@ -132,8 +132,9 @@ impl SingletonSet {
     ///
     /// This method does not insert an element into the set, so it can be
     /// used with types that do not implement [`Default`] and does not need
-    /// the `SimpletonSet` to be mutable.
-    pub fn try_get<T>(&self) -> Option<&T>
+    /// the set to be mutable.
+    #[doc(alias = "try_get()")]
+    pub fn try_as_ref<T>(&self) -> Option<&T>
     where
         T: Any,
     {
@@ -143,10 +144,14 @@ impl SingletonSet {
             .and_then(|boxed| boxed.downcast_ref::<T>())
     }
 
-    /// Returns a mutable reference to the value of the specified type.
-    ///
-    /// This method inserts an element into the set if the type is not
-    /// already represented, so the type must implement [`Default`].
+    /// This is an alias for [`Self::try_as_ref()`]
+    pub fn try_get<T>(&self) -> Option<&T>
+    where
+        T: 'static,
+    {
+        self.try_as_ref()
+    }
+
     pub fn get_mut<T>(&mut self) -> &mut T
     where
         T: Any + Default,
@@ -234,9 +239,9 @@ impl SingletonSet {
     /// Returns a mutable reference to the value of the specified type,
     /// inserting the return value of the provided method if the type isn't
     /// already in the set.
-    pub fn get_or_insert_with_mut<F, T>(&mut self, default: F) -> &mut T
+    #[doc(alias = "get_or_insert_with_mut()")]
+    pub fn as_mut_or_insert_with<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
     where
-        F: FnOnce() -> T,
         T: Any,
     {
         let type_id = std::any::TypeId::of::<T>();
@@ -248,6 +253,50 @@ impl SingletonSet {
             .and_then(|boxed| boxed.downcast_mut::<T>())
             // Safety: The key exists and the type must be correct
             .unwrap()
+    }
+
+    /// This is an alias for [`Self::as_mut_or_insert_with()`]
+    pub fn get_or_insert_with_mut<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
+    where
+        T: 'static,
+    {
+        self.as_mut_or_insert_with(default)
+    }
+}
+
+impl<T> AsRef<T> for SingletonSet
+where
+    T: 'static,
+{
+    /// Returns an immutable reference to the value of the inferred type.
+    ///
+    /// This method does not insert an element into the set, so it can be
+    /// used with types that do not implement [`Default`] and does not need
+    /// the `SimpletonSet` to be mutable.
+    ///
+    /// # Safety
+    ///
+    /// This method panics if there is no existing value for the given type.
+    /// If this is not acceptable, use [`Self::try_with_ref()`],
+    /// [`Self::try_as_ref()`], or one of the `get_or` methods.
+    #[doc(alias = "get_mut()")]
+    fn as_ref(&self) -> &T {
+        self.try_as_ref()
+            .expect("try_as_ref() or as_mut() should be used if the slot might be empty")
+    }
+}
+
+impl<T> AsMut<T> for SingletonSet
+where
+    T: 'static + Default,
+{
+    /// Returns a mutable reference to the value of the specified type.
+    ///
+    /// This method inserts an element into the set if the type is not
+    /// already represented, so the type must implement [`Default`].
+    #[doc(alias = "get()")]
+    fn as_mut(&mut self) -> &mut T {
+        self.as_mut_or_insert_with(|| T::default())
     }
 }
 
