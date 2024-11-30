@@ -11,9 +11,7 @@ use std::{
 /// of any data type it holds. It ensures there is only one instance of any
 /// type, similar to a Singleton, without requiring a global scope.
 #[derive(Debug, Default)]
-pub struct SingletonSet {
-    data: HashMap<TypeId, Box<dyn Any>>,
-}
+pub struct SingletonSet(HashMap<Type, Box<dyn Any>>);
 
 impl SingletonSet {
     /// Creates an empty `SingletonSet`.
@@ -31,9 +29,7 @@ impl SingletonSet {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        SingletonSet {
-            data: HashMap::new(),
-        }
+        SingletonSet(HashMap::new())
     }
 
     /// Creates an empty `SingletonSet` with at least the specified capacity.
@@ -51,58 +47,56 @@ impl SingletonSet {
     #[inline]
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
-        SingletonSet {
-            data: HashMap::with_capacity(capacity),
-        }
+        SingletonSet(HashMap::with_capacity(capacity))
     }
 
     /// Returns the number of elements the set can hold without reallocating.
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.data.capacity()
+        self.0.capacity()
     }
 
     /// Returns the number of elements the set currently holds.
     #[inline]
     pub fn len(&self) -> usize {
-        self.data.len()
+        self.0.len()
     }
 
     /// Returns true if the set contains no elements.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
+        self.0.is_empty()
     }
 
     /// Clears the set, removing all values.
     #[inline]
     pub fn clear(&mut self) {
-        self.data.clear()
+        self.0.clear()
     }
 
     /// Reserves capacity for at least `additional` more values.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.data.reserve(additional)
+        self.0.reserve(additional)
     }
 
     /// Tries to reserve capacity for at least `additional` more values.
     #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
-        self.data.try_reserve(additional)
+        self.0.try_reserve(additional)
     }
 
     /// Shrinks the capacity of the set as much as possible.
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.data.shrink_to_fit()
+        self.0.shrink_to_fit()
     }
 
     /// Shrinks the capacity of the set as much as possible, but not less than
     /// `min_capacity`.
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
-        self.data.shrink_to(min_capacity)
+        self.0.shrink_to(min_capacity)
     }
 
     /// Returns an immutable reference to the value of the specified type.
@@ -120,11 +114,7 @@ impl SingletonSet {
     where
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data
-            .get(&type_id)
-            .and_then(|boxed| boxed.downcast_ref::<T>())
-            .expect("try_get() should be used if the slot might be empty")
+        self.as_ref()
     }
 
     /// Returns an immutable reference to the value of the specified type,
@@ -138,9 +128,8 @@ impl SingletonSet {
     where
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data
-            .get(&type_id)
+        self.0
+            .get(&Type::of::<T>())
             .and_then(|boxed| boxed.downcast_ref::<T>())
     }
 
@@ -156,13 +145,7 @@ impl SingletonSet {
     where
         T: Any + Default,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data.entry(type_id).or_insert(Box::new(T::default()));
-        self.data
-            .get_mut(&type_id)
-            .and_then(|boxed| boxed.downcast_mut::<T>())
-            // Safety: The key exists and the type must be correct
-            .unwrap()
+        self.as_mut()
     }
 
     /// Returns a mutable reference to the value of the specified type,
@@ -174,9 +157,8 @@ impl SingletonSet {
     where
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data
-            .get_mut(&type_id)
+        self.0
+            .get_mut(&Type::of::<T>())
             .and_then(|boxed| boxed.downcast_mut::<T>())
     }
 
@@ -189,12 +171,12 @@ impl SingletonSet {
     where
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data.entry(type_id).or_insert(Box::new(value));
-        self.data
-            .get(&type_id)
-            .and_then(|boxed| boxed.downcast_ref::<T>())
-            // Safety: The key exists and the type must be correct
+        self.0
+            .entry(Type::of::<T>())
+            .or_insert(Box::new(value))
+            .downcast_ref::<T>()
+            // Safety: It should be safe to downcast a value back to its
+            // original type, so this `unwrap()` will never panic.
             .unwrap()
     }
 
@@ -208,11 +190,10 @@ impl SingletonSet {
     where
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data.entry(type_id).or_insert(Box::new(value));
-        self.data
-            .get_mut(&type_id)
-            .and_then(|boxed| boxed.downcast_mut::<T>())
+        self.0
+            .entry(Type::of::<T>())
+            .or_insert(Box::new(value))
+            .downcast_mut::<T>()
             // Safety: The key exists and the type must be correct
             .unwrap()
     }
@@ -225,13 +206,10 @@ impl SingletonSet {
         F: FnOnce() -> T,
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data
-            .entry(type_id)
-            .or_insert_with(|| Box::new(default()));
-        self.data
-            .get(&type_id)
-            .and_then(|boxed| boxed.downcast_ref::<T>())
+        self.0
+            .entry(Type::of::<T>())
+            .or_insert_with(|| Box::new(default()))
+            .downcast_ref::<T>()
             // Safety: The key exists and the type must be correct
             .unwrap()
     }
@@ -244,13 +222,10 @@ impl SingletonSet {
     where
         T: Any,
     {
-        let type_id = std::any::TypeId::of::<T>();
-        self.data
-            .entry(type_id)
-            .or_insert_with(|| Box::new(default()));
-        self.data
-            .get_mut(&type_id)
-            .and_then(|boxed| boxed.downcast_mut::<T>())
+        self.0
+            .entry(Type::of::<T>())
+            .or_insert_with(|| Box::new(default()))
+            .downcast_mut::<T>()
             // Safety: The key exists and the type must be correct
             .unwrap()
     }
