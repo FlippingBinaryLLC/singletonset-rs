@@ -4,125 +4,125 @@ fn main() {
     let mut set = SingletonSet::new();
 
     // The object is initially empty.
-    println!("The set is empty: {}", set.is_empty());
+    assert!(set.is_empty());
 
     // A `SingletonSet` holds automatically calls `Default::default()` on
-    // any type that implements it when an instance of the type is requested
-    // for the first time.
-    println!("First mutable access of u8: {}", set.get_mut::<u8>());
+    // any type that implements it when an instance of the type is accessed
+    // for the first time using a `_mut` method.
+    assert_eq!(set.as_mut() as &u8, &0);
 
     // After that, the set holds an instance of that type.
-    println!("The set now contains {} element", set.len());
+    assert_eq!(set.len(), 1);
 
-    // The instance can be replaced or mutated, but only the latest instance
-    // is the one stored in the set.
-    *set.get_mut() = 10u8;
-    *set.get_mut() = 5u8;
-    *set.get_mut() = 2u8;
+    // The instance of each type can be replaced or mutated as long as the
+    // set is mutable.
+    *set.as_mut() = 10u8;
+    *set.as_mut() = 5u8;
+    *set.as_mut() = 2u8;
 
-    // The set still contains only one element, which is the last one (2u8)
-    // because the previous values were replaced each time.
-    println!(
-        "The set still contains {} element, which is {}",
-        set.len(),
-        set.get::<u8>()
-    );
+    // At this point, the set still contains only one element, which is the
+    // last one (2u8), because the previous values were replaced each time.
+    // It can be retrieved with `as_ref()` if the desired value's type is
+    // supplied with type coercion.
+    assert_eq!(set.as_ref() as &u8, &2);
 
-    // Each element in the set can be manipulated in place, but the type must
-    // be specified as a generic parameter of `get_mut()` in situations when
-    // the compiler can't infer it correctly.
+    // Each element in the set can be manipulated in place with either
+    // `get_mut()` or `as_mut()`, but `get_mut()` can take a generic
+    // parameter, which can be useful in some cases.
     *set.get_mut::<u8>() *= 2;
+    *(set.get_mut() as &mut u8) *= 2;
+    *(set.as_mut() as &mut u8) *= 2;
 
-    println!(
-        "Now the {} set element has been updated to {}",
-        set.len(),
-        set.get::<u8>()
-    );
+    assert_eq!(set.as_ref() as &u8, &16);
 
-    // Alternatively, a default value can be specified, which provides the
-    // type key
+    // Alternatively, a default value can be specified, which the set uses to
+    // infer the type.
     *set.get_or_insert_mut(14u8) *= 2;
 
-    println!("Now the u8 slot holds {}", set.get::<u8>());
+    // The type is inferred from `14u8`, but its value was not used because
+    // the slot in the set was not empty.
+    assert_eq!(set.as_ref() as &u8, &32);
 
-    // Now the u8 slot contains 2 * 2 * 2 = 8. The `14u8` is used for its
-    // type, but not its value because a value already exists in the slot.
-    // If a value hadn't existed in the slot, the default value would have
-    // been used.
-    *set.get_or_insert_mut(14u16) *= 2;
+    // There isn't any u16 value in the set yet, so this call to
+    // `as_mut_or_insert` first inserts `35` into the `u16` slot of the set,
+    // then retrieves it so it can be multiplied by `2`.
+    *set.as_mut_or_insert(35u16) *= 2;
 
-    // This should print 14 * 2 = 28 because there wasn't any u16 value in
-    // the set until `get_or_insert_mut` was called.
-    println!("The new u16 slot holds {}", set.get::<u16>());
+    // This will print the `u16` value in the set, which is 35 * 2 = 70
+    assert_eq!(set.as_ref() as &u16, &70);
 
     // More complex types can also be held in the set
+    set.insert("Foo".to_string());
 
-    *set.get_mut() = "A static str";
-    *set.get_mut() = "A dynamic String".to_string();
+    // These more complex types can also be manipulated in place with a
+    // generic type parameter.
+    set.get_mut::<String>().push_str(", bar");
 
-    // These more complex types can also be manipulated in place, but it gets
-    // a bit messy.
-    (*set.get_mut::<String>()).insert_str(1, " single");
+    // ... or type coercion
+    (set.as_mut() as &mut String).push_str(", baz");
 
-    // The complexity can be reduce a little by using local variables
-    let s = set.get_mut::<String>();
-    s.push_str(" easily");
+    // ... or scope the local variable using one of the `with_` methods.
+    set.with_ref(|msg: &String| assert_eq!(msg, &"Foo, bar, baz".to_string()));
 
-    // Notice the set now contains 4 elements. One is in the `u8` slot, one
-    // in the `u16` slot, one in the `&'static str` slot, and one in the
-    // `String` slot.
-    println!(
-        "'{}' is in the set of {} total elements",
-        set.get::<String>(),
-        set.len()
+    // Notice the set now contains 3 elements. One is in the `u8` slot, one
+    // in the `u16` slot, and one in the `String` slot.
+    assert_eq!(set.len(), 3);
+
+    // If you want to get a value from the set without causing one to be
+    // created, use one of the `try_` methods.
+    assert_eq!(set.try_get::<u8>(), Some(&32));
+
+    // To simply test if a type is represented in the set, use one of the
+    // `contains` methods.
+    assert!(!set.contains::<f64>());
+
+    // If you need to store objects of types that do not implement `Default`,
+    // like this one, some methods won't be available.
+    #[derive(Debug, PartialEq)]
+    struct Foo(String);
+
+    // One method uses two closures. This method calls the default closure
+    // only if the value doesn't already exist in the set. It always calls
+    // the other closure. That closure's return value gets passed through.
+    let ret = set.with_mut_or_else(
+        || Foo("Default".to_string()),
+        |val| {
+            *val = Foo("Wild!".to_string());
+            42
+        },
+    );
+    assert_eq!(ret, 42);
+
+    // ... alternatively
+    set.with_mut_or_else(
+        || Foo("Default".to_string()),
+        |val| *val = Foo("Wilder!".to_string()),
     );
 
-    // You might want to check if a type slot holds a value without actually
-    // creating one. For that, use `try_get()`
-    if let Some(val) = set.try_get::<u8>() {
-        println!("A u8 containing {} was found", val);
-    } else {
-        println!("This will not print because the set holds a u8");
+    // Now the set holds a `Foo` containing the string `Wilder!`.
+    assert_eq!(set.as_ref() as &Foo, &Foo("Wilder!".to_string()));
+
+    // Finally, the types represented by the set can be iterated.
+    for t in set.types() {
+        match t.as_name() {
+            "u8" => {
+                println!("Set holds a u8: {}", set.as_ref() as &u8);
+            }
+            "u16" => {
+                println!("Set holds a u16: {}", set.as_ref() as &u16);
+            }
+            "u32" => {
+                println!("Set holds a u32: {}", set.as_ref() as &u32);
+            }
+            "str" => {
+                println!("Set holds a &str: '{}'", set.as_ref() as &&str);
+            }
+            "String" => {
+                println!("Set holds a String: '{}'", set.as_ref() as &String);
+            }
+            _ => {
+                println!("Set holds another type of value, a {}", t);
+            }
+        }
     }
-    if let Some(val) = set.try_get::<f64>() {
-        println!(
-            "There is no f64 value in the set, so {} will not print.",
-            val
-        );
-    } else {
-        println!("There is no f64 value in the set.");
-    }
-
-    // If you need to store objects that do not implement `Default`, you must
-    // supply an object or closure each time an element is accessed. Both
-    // `get()` and `get_mut()` will not work with types that do not implement
-    // `Default`.
-    struct Foo(&'static str);
-    *set.get_or_insert_mut(Foo("default str")) = Foo("Hello, World!");
-    println!(
-        "The message is: {}",
-        set.get_or_insert(Foo("different default str")).0
-    );
-
-    // When the default object is not trivial to construct, it may be more
-    // efficient to supply a closure instead. The closure is lazily-called,
-    // so no memory is allocated if the type is already represented in the
-    // `SingletonSet`.
-    struct Bar(String);
-    *set.get_or_insert_with_mut(|| Bar("default string".to_string())) =
-        Bar("Hello, World again!".to_string());
-    println!(
-        "The message is: {}",
-        set.get_or_insert_with(|| Bar("different default string".to_string()))
-            .0
-    );
-
-    // That gets messy again, but a method can be used instead of a closure.
-    fn bar() -> Bar {
-        Bar("default string from method".to_string())
-    }
-    *set.get_or_insert_with_mut(bar) = Bar("Wild!".to_string());
-
-    // Now the set holds a `Bar` containing the string `Wild!`.
-    println!("This is {}", set.try_get::<Bar>().unwrap().0);
 }

@@ -33,13 +33,28 @@ This data structure can be used to create a locally-scoped Singleton out of
 any data types within it. It ensures there is only one instance of any type,
 similar to a Singleton, without polluting the global scope.
 
+## Project Status
+
+This is an alpha release. This project is under active development for a very
+specific use-case. Even though the API is not yet stable, this package is
+being shared in case others find it useful or want to offer suggestions for
+how to overcome certain challenges.
+
+In this early release stage, there are inevitably going to be bugs. Please
+don't use this for anything critical yet.
+
+Also, the name of the crate and the data structure may change at some point.
+`SingletonSet` seemed fitting, but it is a bit long. Suggestions are welcome!
+
 ## Features
 
-- **Type Safety:** Ensures that only one value per type is present in the
-  set, using Rust's type system and `std::any::TypeId`.
+- **Type Safety:** Ensures that only one value per type is present in the set
+  at all times, using Rust's type system.
 - **Flexible Initialization:** Types that implement `Default` can be
   automatically initialized, or any type can be initialized from a value or
   closure for fully customizable initialization.
+- **Global Safety:** In contrast to global singletons, a `SingletonSet`
+  object can be scoped as needed.
 
 ## Example Usage
 
@@ -49,26 +64,24 @@ use singletonset::SingletonSet;
 fn main() {
     let mut set = SingletonSet::new();
 
-    // Initialize a u32 value from its default value
-    set.get_mut::<u32>();
+    // Initialize from a default value
+    set.insert_default::<u32>();
 
-    // Initialize a String using a closure
-    set.get_or_insert_with_mut(|| "Hello".to_string());
+    // Initialize from a closure
+    set.insert_with(|| "Hello".to_string());
 
     // Access and modify values
-    *set.get_mut::<u32>() = 42;
-    *set.get_mut::<String>() += ", World!";
+    set.with_mut(|val: &mut u32| *val += 2);
+    set.with_mut::<u32, _>(|val| *val *= 3);
+    set.with_mut(|val: &mut String| *val += ", World!");
 
     // The type must never be ambiguous, but can be inferred.
-    *set.get_mut() = 35.77f64;
-
-    // Initialization functions have no effect on existing values
-    set.get_or_insert_with_mut(|| "Goodbye".to_string());
+    *set.as_mut() = 35.77f64;
 
     println!("u32: {}, f64: {}, String: {}",
-      set.get::<u32>(),
-      set.get::<f64>(),
-      set.get::<String>()
+      set.as_ref() as &u32,
+      set.as_ref() as &f64,
+      set.as_ref() as &String
     );
 }
 ```
