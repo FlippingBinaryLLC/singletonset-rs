@@ -524,6 +524,12 @@ impl Type {
 
     /// Returns a [`TypeId`] representing the type uniquely among all other
     /// types available to the compiler.
+    pub fn as_id(&self) -> &TypeId {
+        &self.0
+    }
+
+    /// Returns a [`TypeId`] representing the type uniquely among all other
+    /// types available to the compiler.
     pub fn to_id(&self) -> TypeId {
         self.0
     }
@@ -536,6 +542,11 @@ impl Type {
         self.1
     }
 
+    // NOTE: `to_str` is not implemented as a convenience method because the
+    // return value would have to be `String`, so the name `to_string` would
+    // be more appropriate, but that's already implemented via the `Display`
+    // implementation.
+
     /// Returns a short name of the type as a string.
     ///
     /// The short type name is not guaranteed to be consistent across
@@ -547,6 +558,18 @@ impl Type {
 
         &self.1[from_index..to_index]
     }
+
+    /// Returns a short name of the type as a string.
+    ///
+    /// The short type name is not guaranteed to be consistent across
+    /// multiple builds, or unique among available types.
+    pub fn to_name(&self) -> String {
+        let to_index = self.1.find('<').unwrap_or(self.1.len());
+
+        let from_index = self.1[..to_index].rfind(':').map_or(0, |i| i + 1);
+
+        self.1[from_index..to_index].to_string()
+    }
 }
 
 impl AsRef<str> for Type {
@@ -557,7 +580,7 @@ impl AsRef<str> for Type {
 
 impl AsRef<TypeId> for Type {
     fn as_ref(&self) -> &TypeId {
-        &self.0
+        self.as_id()
     }
 }
 
