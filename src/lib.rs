@@ -7,7 +7,8 @@ use std::{
     hash::Hasher,
 };
 
-use hashbrown::{HashMap, TryReserveError};
+use indexmap::IndexMap;
+pub use indexmap::TryReserveError;
 
 /// A hash map that uses the value's type as its key.
 ///
@@ -15,14 +16,13 @@ use hashbrown::{HashMap, TryReserveError};
 /// of any data type it holds. It ensures there is only one instance of any
 /// type, similar to a Singleton, without requiring a global scope.
 #[derive(Debug, Default)]
-pub struct SingletonSet(HashMap<Type, Box<dyn Any>>);
+pub struct SingletonSet(IndexMap<Type, Box<dyn Any>>);
 
 impl SingletonSet {
     /// Creates an empty `SingletonSet`.
     ///
     /// The set is initially created with a capacity of 0, so it will not
-    /// allocate until an element is inserted. This behavior is inherited
-    /// from the internal `HashMap` that is used to stored the elements.
+    /// allocate until an element is inserted.
     ///
     /// # Example
     ///
@@ -33,14 +33,14 @@ impl SingletonSet {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        SingletonSet(HashMap::new())
+        SingletonSet(IndexMap::new())
     }
 
     /// Creates an empty `SingletonSet` with at least the specified capacity.
     ///
     /// The set will be able to hold at least `capacity` elements without
-    /// reallocating. The hash map that stores the elements internally does
-    /// not provide any guarantee that more space won't be allocated.
+    /// reallocating. There is no guarantee that more space won't be
+    /// allocated.
     ///
     /// # Example
     ///
@@ -51,7 +51,7 @@ impl SingletonSet {
     #[inline]
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
-        SingletonSet(HashMap::with_capacity(capacity))
+        SingletonSet(IndexMap::with_capacity(capacity))
     }
 
     /// Returns the number of elements the set can hold without reallocating.
@@ -448,7 +448,7 @@ where
     ///
     /// This method does not insert an element into the set, so it can be
     /// used with types that do not implement [`Default`] and does not need
-    /// the `SimpletonSet` to be mutable.
+    /// the set to be mutable.
     ///
     /// # Safety
     ///
@@ -477,7 +477,7 @@ where
 }
 
 /// An iterator of the [`Type`]s in a [`SingletonSet`].
-pub struct Types<'a>(hashbrown::hash_map::Keys<'a, Type, Box<dyn Any>>);
+pub struct Types<'a>(indexmap::map::Keys<'a, Type, Box<dyn Any>>);
 
 impl<'a> Iterator for Types<'a> {
     type Item = &'a Type;

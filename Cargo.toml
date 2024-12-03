@@ -12,4 +12,4 @@ edition = "2021"
 exclude = [".gitignore", ".github", ".markdownlint.jsonc"]
 
 [dependencies]
-hashbrown = "0.15"
+indexmap = "2.7"
