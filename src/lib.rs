@@ -155,8 +155,8 @@ impl SingletonSet {
     /// Calls a closure with some value of the corresponding type's
     /// slot, returning the closure's return value.
     ///
-    /// If the slot is empty, the closure is passed `None`. This method will
-    /// not initialize an empty slot.
+    /// If the slot is empty, the closure is passed [`None`]. This method
+    /// will not initialize an empty slot.
     pub fn try_with_ref<T, R>(&self, f: impl FnOnce(Option<&T>) -> R) -> R
     where
         T: 'static,
@@ -170,8 +170,11 @@ impl SingletonSet {
     /// # Safety
     ///
     /// This method panics if there is no existing value for the given type.
-    /// If this is not acceptable, use [`Self::try_with_ref()`],
-    /// [`Self::try_as_ref()`], or one of the `get_or` methods.
+    /// If this is not acceptable, use [`.try_with_ref()`],
+    /// [`.try_as_ref()`], or one of the `get_or` methods.
+    ///
+    /// [`.try_with_ref()`]: Self::try_with_ref()
+    /// [`.try_as_ref()`]: Self::try_as_ref()
     pub fn with_ref<T, R>(&self, f: impl FnOnce(&T) -> R) -> R
     where
         T: 'static,
@@ -218,7 +221,7 @@ impl SingletonSet {
     /// Calls a provided closure with some mutable reference to the
     /// corresponding type's slot, returning the closure's return value.
     ///
-    /// If the slot is empty, the closure is passed `None`.
+    /// If the slot is empty, the closure is passed [`None`].
     pub fn try_with_mut<T, R>(&mut self, f: impl FnOnce(Option<&mut T>) -> R) -> R
     where
         T: 'static,
@@ -228,12 +231,6 @@ impl SingletonSet {
 
     /// Calls a provided closure with the value of the corresponding type's
     /// slot, if it exists, returning its return value.
-    ///
-    /// # Safety
-    ///
-    /// This method panics if there is no existing value for the given type.
-    /// If this is not acceptable, use [`Self::try_with_mut()`],
-    /// [`Self::try_as_mut()`], or one of the `get_or` methods.
     pub fn with_mut<T, R>(&mut self, f: impl FnOnce(&mut T) -> R) -> R
     where
         T: 'static + Default,
@@ -361,7 +358,9 @@ impl SingletonSet {
     ///
     /// If the type is already represented in the set, the provided value
     /// is ignored. To avoid allocating memory for a default value that is
-    /// discarded, use [`SingletonSet::get_or_insert_with_mut()`].
+    /// discarded, use [`.get_or_insert_with_mut()`].
+    ///
+    /// [`.get_or_insert_with_mut()`]: Self::get_or_insert_with_mut()
     #[doc(alias = "get_or_insert_mut()")]
     pub fn as_mut_or_insert<T>(&mut self, value: T) -> &mut T
     where
@@ -375,7 +374,9 @@ impl SingletonSet {
             .unwrap()
     }
 
-    /// This is an alias for [`Self::as_mut_or_insert()`]
+    /// This is an alias for [`.as_mut_or_insert(value)`]
+    ///
+    /// [`.as_mut_or_insert(value)`]: Self::as_mut_or_insert()
     pub fn get_or_insert_mut<T>(&mut self, value: T) -> &mut T
     where
         T: 'static,
@@ -423,7 +424,9 @@ impl SingletonSet {
             .unwrap()
     }
 
-    /// This is an alias for [`Self::as_mut_or_insert_with()`]
+    /// This is an alias for [`.as_mut_or_insert_with(default)`]
+    ///
+    /// [`.as_mut_or_insert_with(default)`]: Self::as_mut_or_insert_with()
     pub fn get_or_insert_with_mut<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
     where
         T: 'static,
@@ -453,12 +456,15 @@ where
     /// # Safety
     ///
     /// This method panics if there is no existing value for the given type.
-    /// If this is not acceptable, use [`Self::try_with_ref()`],
-    /// [`Self::try_as_ref()`], or one of the `get_or` methods.
+    /// If this is not acceptable, use methods like [`.try_with_ref()`],
+    /// [`.try_as_ref()`], or a `_mut` method.
+    ///
+    /// [`.try_with_ref()`]: Self::try_with_ref()
+    /// [`.try_as_ref()`]: Self::try_as_ref()
     #[doc(alias = "get_mut()")]
     fn as_ref(&self) -> &T {
         self.try_as_ref()
-            .expect("try_as_ref() or as_mut() should be used if the slot might be empty")
+            .expect(".try_as_ref() or .as_mut() should be used if the slot might be empty")
     }
 }
 
@@ -470,7 +476,7 @@ where
     ///
     /// This method inserts an element into the set if the type is not
     /// already represented, so the type must implement [`Default`].
-    #[doc(alias = "get()")]
+    #[doc(alias = "get_mut()")]
     fn as_mut(&mut self) -> &mut T {
         self.as_mut_or_insert_with(|| T::default())
     }
@@ -493,12 +499,17 @@ impl<'a> Iterator for Types<'a> {
 /// only available for types with a static lifetime.
 ///
 /// For a string representation of the type, there are two options. The full
-/// name according to the compiler can be obtained with [`Type::as_str()`].
+/// name according to the compiler can be obtained with [`.as_str()`].
 /// This may be the full path of the type, such as `"core::option::Option"`,
 /// but it comes with no guarantees. A shortened version holding the last
-/// segment of the type name can be obtained by calling [`Type::as_name()`].
+/// segment of the type name can be obtained by calling [`.as_name()`],
+/// also with no guarantees (arguably fewer guarantees). Currently,
+/// `as_name()` returns the string slice within `as_str()` located between
+/// the first open angle bracket (`<`) and the nearest colon (`:`) to the
+/// left of it.
 ///
-/// The [`TypeId`] can be obtained by calling [`Type::to_id()`]
+/// [`.as_str()`]: Self::as_str()
+/// [`.as_name()`]: Self::as_name()
 #[derive(Clone, Copy, Debug, Eq)]
 pub struct Type(TypeId, &'static str);
 
