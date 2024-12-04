@@ -1,6 +1,6 @@
 [package]
 name = "singletonset"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Jon Musselwhite"]
 categories = ["data-structures"]
 description = "This crate provides the `SingletonSet` data structure, which makes it easy to store a single instance each of various types within a single set."
